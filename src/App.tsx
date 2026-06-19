@@ -10,6 +10,7 @@ import ScheduleListPage from '@/pages/schedules/ScheduleListPage';
 import ScheduleDetailPage from '@/pages/schedules/ScheduleDetailPage';
 import AssignmentPage from '@/pages/assignments/AssignmentPage';
 import ReviewPage from '@/pages/assignments/ReviewPage';
+import PrepListPage from '@/pages/assignments/PrepListPage';
 import SurveyFillPage from '@/pages/survey/SurveyFillPage';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/schedules/:id" element={<ScheduleDetailPage />} />
           <Route path="/schedules/:id/assign" element={<AssignmentPage />} />
           <Route path="/schedules/:id/review" element={<ReviewPage />} />
+          <Route path="/schedules/:id/prep" element={<PrepListPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/players" element={<PlayersPage />} />
         </Route>

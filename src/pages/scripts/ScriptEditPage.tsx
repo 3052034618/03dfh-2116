@@ -23,27 +23,11 @@ import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import {
+  GENRE_OPTIONS,
   getGenreBadgeClass,
   getGenderLabel,
 } from '@/utils/assignmentEngine';
 import type { Script, Role, RoleRelation } from '@/types';
-
-const GENRE_OPTIONS = [
-  '情感',
-  '硬核',
-  '欢乐',
-  '恐怖',
-  '阵营',
-  '本格',
-  '变格',
-  '还原',
-  '机制',
-  '古风',
-  '现代',
-  '民国',
-  '科幻',
-  '校园',
-];
 
 const RELATION_TYPE_META: Record<
   RoleRelation['type'],

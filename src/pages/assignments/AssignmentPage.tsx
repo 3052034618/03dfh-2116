@@ -20,6 +20,10 @@ import {
   X,
   Check,
   Lock as LockIcon,
+  GitBranch,
+  Clock,
+  History,
+  ClipboardList,
 } from 'lucide-react';
 import {
   DndContext,
@@ -49,7 +53,7 @@ import RoleAvatar from '@/components/ui/RoleAvatar';
 import Badge from '@/components/ui/Badge';
 import StarRating from '@/components/ui/StarRating';
 import Modal from '@/components/ui/Modal';
-import type { AssignmentPair, AssignmentWarning, MatchCell, PlayerProfile, Role, Schedule, SchedulePlayer, Script, DM, MatchScoreItem, PlayerSurvey } from '@/types';
+import type { AssignmentPair, AssignmentVersion, AssignmentWarning, MatchCell, PlayerProfile, Role, Schedule, SchedulePlayer, Script, DM, MatchScoreItem, PlayerSurvey } from '@/types';
 
 const statusBadgeMap: Record<string, { variant: any; label: string }> = {
   pending: { variant: 'amber', label: '待确认' },
@@ -206,10 +210,11 @@ export default function AssignmentPage() {
   const getScriptById = useScriptStore((s) => s.getScriptById);
   const getPlayerById = usePlayerStore((s) => s.getPlayerById);
   const getDMById = useDMStore((s) => s.getDMById);
-  const { generateSuggestion, getSuggestion, toggleLock, swapRoles, finalizeAssignment } = useAssignmentStore();
+  const { generateSuggestion, getSuggestion, toggleLock, swapRoles, finalizeAssignment, createVersion, switchToVersion } = useAssignmentStore();
 
   const [loading, setLoading] = useState(true);
   const [warningsExpanded, setWarningsExpanded] = useState(true);
+  const [versionsExpanded, setVersionsExpanded] = useState(false);
   const [confirmedWarnings, setConfirmedWarnings] = useState<Set<string>>(new Set());
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [pendingCell, setPendingCell] = useState<{ playerId: string; roleId: string } | null>(null);
@@ -239,12 +244,34 @@ export default function AssignmentPage() {
       const existingSuggestion = id ? getSuggestion(id) : undefined;
       if (!existingSuggestion) {
         const newSuggestion = generateAssignment(schedule, script, playerProfiles);
+        const suggestionWithVersions = {
+          ...newSuggestion,
+          versions: [],
+          currentVersionId: '',
+        };
         useAssignmentStore.setState((state) => ({
           suggestions: {
             ...state.suggestions,
-            [id!]: newSuggestion,
+            [id!]: suggestionWithVersions,
           },
         }));
+        useAssignmentStore.getState().createVersion(id!, 'auto_generate', '智能生成初始方案');
+      } else if (!existingSuggestion.versions || existingSuggestion.versions.length === 0) {
+        useAssignmentStore.setState((state) => {
+          const cur = state.suggestions[id!];
+          if (!cur) return state;
+          return {
+            suggestions: {
+              ...state.suggestions,
+              [id!]: {
+                ...cur,
+                versions: cur.versions || [],
+                currentVersionId: cur.currentVersionId || '',
+              },
+            },
+          };
+        });
+        useAssignmentStore.getState().createVersion(id!, 'auto_generate', '智能生成初始方案');
       }
       setLoading(false);
     }, 600);
@@ -370,6 +397,20 @@ export default function AssignmentPage() {
         },
       },
     }));
+
+    setTimeout(() => {
+      const cur = useAssignmentStore.getState().suggestions[id];
+      if (cur && cur.versions.length > 0) {
+        const lastVersion = cur.versions[cur.versions.length - 1];
+        const hasChanges = JSON.stringify(lastVersion.plan) !== JSON.stringify(cur.finalPlan);
+        if (hasChanges) {
+          const player = getPlayerById(playerId);
+          const role = roles.find((r) => r.id === roleId);
+          const desc = player && role ? `${player.name}调整为${role.name}` : '手动调整分配方案';
+          useAssignmentStore.getState().createVersion(id, 'manual_adjust', desc);
+        }
+      }
+    }, 0);
   }
 
   function handleRegenerate() {
@@ -380,13 +421,24 @@ export default function AssignmentPage() {
       .map((sp) => getPlayerById(sp.playerId))
       .filter(Boolean) as PlayerProfile[];
     const newSuggestion = generateAssignment(schedule, script, playerProfiles);
+    const existingVersions = suggestion?.versions || [];
+    const suggestionWithVersions = {
+      ...newSuggestion,
+      versions: existingVersions,
+      currentVersionId: suggestion?.currentVersionId || '',
+    };
     useAssignmentStore.setState((state) => ({
       suggestions: {
         ...state.suggestions,
-        [id]: newSuggestion,
+        [id]: suggestionWithVersions,
       },
     }));
-    setTimeout(() => setLoading(false), 500);
+    const versionType = isExpired ? 'regen_expired' : 'auto_generate';
+    const versionDesc = isExpired ? '问卷更新后重算方案' : '重新生成分角方案';
+    setTimeout(() => {
+      useAssignmentStore.getState().createVersion(id, versionType, versionDesc);
+      setLoading(false);
+    }, 500);
   }
 
   function handleConfirmWarning(warning: AssignmentWarning) {
@@ -414,6 +466,11 @@ export default function AssignmentPage() {
     newPlan[idxA] = { ...newPlan[idxA], roleId: roleIdB };
     newPlan[idxB] = { ...newPlan[idxB], roleId: roleIdA };
 
+    const playerAId = active.id as string;
+    const playerBId = over.id as string;
+    const playerA = getPlayerById(playerAId);
+    const playerB = getPlayerById(playerBId);
+
     useAssignmentStore.setState((state) => ({
       suggestions: {
         ...state.suggestions,
@@ -424,6 +481,18 @@ export default function AssignmentPage() {
         },
       },
     }));
+
+    setTimeout(() => {
+      const cur = useAssignmentStore.getState().suggestions[id];
+      if (cur && cur.versions.length > 0) {
+        const lastVersion = cur.versions[cur.versions.length - 1];
+        const hasChanges = JSON.stringify(lastVersion.plan) !== JSON.stringify(cur.finalPlan);
+        if (hasChanges) {
+          const desc = playerA && playerB ? `拖拽交换了${playerA.name}和${playerB.name}的角色` : '手动调整分配方案';
+          useAssignmentStore.getState().createVersion(id, 'manual_adjust', desc);
+        }
+      }
+    }, 0);
   }
 
   function handleUnlockAll() {
@@ -489,7 +558,21 @@ export default function AssignmentPage() {
         },
       },
     }));
+
+    setTimeout(() => {
+      const cur = useAssignmentStore.getState().suggestions[id];
+      if (cur && cur.versions.length > 0) {
+        const lastVersion = cur.versions[cur.versions.length - 1];
+        const hasChanges = JSON.stringify(lastVersion.plan) !== JSON.stringify(cur.finalPlan);
+        if (hasChanges) {
+          useAssignmentStore.getState().createVersion(id, 'manual_adjust', '随机打乱未锁定部分');
+        }
+      }
+    }, 0);
   }
+
+  const versions = suggestion?.versions || [];
+  const currentVersionId = suggestion?.currentVersionId || '';
 
   const stats = useMemo(() => {
     const scores = finalPlan.map((p) => getCellScore(p.playerId, p.roleId));
@@ -501,6 +584,24 @@ export default function AssignmentPage() {
       totalCount: finalPlan.length,
     };
   }, [finalPlan, getCellScore, totalRemainingWarnings]);
+
+  const versionTypeConfig: Record<AssignmentVersion['type'], { variant: any; label: string }> = {
+    auto_generate: { variant: 'amber', label: '智能生成' },
+    manual_adjust: { variant: 'sunset', label: '手动调整' },
+    regen_expired: { variant: 'crimson', label: '过期重算' },
+  };
+
+  function formatVersionTime(isoString: string): { time: string; date: string } {
+    const d = new Date(isoString);
+    const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const date = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+    return { time, date };
+  }
+
+  function handleSwitchVersion(versionId: string) {
+    if (!id) return;
+    switchToVersion(id, versionId);
+  }
 
   if (loading) {
     return <AssignmentSkeleton />;
@@ -599,10 +700,19 @@ export default function AssignmentPage() {
                 <Lock className="w-4 h-4" />
                 锁定高分分配
               </button>
+              {finalPlan.length > 0 && (
+                <button
+                  onClick={() => navigate(`/schedules/${id}/prep`)}
+                  className="btn-ghost flex items-center gap-2"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  📋 开本清单
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (id) finalizeAssignment(id);
-                  navigate(`/schedules/${id}/review`);
+                  navigate(`/schedules/${id}/prep`);
                 }}
                 className="btn-gold flex items-center gap-2"
               >
@@ -640,6 +750,182 @@ export default function AssignmentPage() {
             </div>
           </div>
         )}
+
+        {/* ========== 版本历史面板 ========== */}
+        <div className="card-dark mb-6 overflow-hidden">
+          <button
+            onClick={() => setVersionsExpanded((v) => !v)}
+            className="w-full flex items-center justify-between p-5 hover:bg-ink-700/30 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <GitBranch className="w-6 h-6 text-amber-400" />
+              <div className="text-left">
+                <div className="text-lg font-semibold text-amber-300">
+                  📋 版本历史
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  共 {versions.length} 个版本 · 当前 V{versions.find(v => v.id === currentVersionId)?.versionNumber || versions.length}
+                </div>
+              </div>
+              {versions.length > 0 && (
+                <Badge variant="amber">{versions.length}</Badge>
+              )}
+            </div>
+            <ChevronRight className={cn(
+              'w-5 h-5 text-slate-400 transition-transform',
+              versionsExpanded && 'rotate-90'
+            )} />
+          </button>
+
+          {versionsExpanded && (
+            <div className="px-5 pb-5 border-t border-ink-600/50 pt-4">
+              {versions.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <History className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <div className="text-sm">暂无版本记录</div>
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* 时间轴竖线 */}
+                  <div className="absolute left-[18px] top-2 bottom-2 w-px bg-gradient-to-b from-amber-500/60 via-ink-500/50 to-ink-500/30" />
+
+                  <div className="space-y-4">
+                    {[...versions].reverse().map((version) => {
+                      const { time, date } = formatVersionTime(version.createdAt);
+                      const typeCfg = versionTypeConfig[version.type];
+                      const isCurrent = version.id === currentVersionId;
+
+                      return (
+                        <div key={version.id} className="relative pl-12">
+                          {/* 时间轴节点 */}
+                          <div className={cn(
+                            'absolute left-[6px] top-4 w-6 h-6 rounded-full border-2 flex items-center justify-center z-10',
+                            isCurrent
+                              ? 'bg-amber-500/20 border-amber-500'
+                              : 'bg-ink-700 border-ink-500'
+                          )}>
+                            {isCurrent ? (
+                              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                            ) : (
+                              <div className="w-1.5 h-1.5 rounded-full bg-ink-400" />
+                            )}
+                          </div>
+
+                          {/* 版本卡片 */}
+                          <div className={cn(
+                            'rounded-xl border p-4 transition-all',
+                            isCurrent
+                              ? 'border-amber-500/40 bg-amber-500/5 shadow-[0_0_15px_rgba(251,191,36,0.1)]'
+                              : 'border-ink-500/40 bg-ink-700/30 hover:border-ink-400/50'
+                          )}>
+                            {/* 顶部：版本号 + 时间 + 类型 */}
+                            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                              <div className="flex items-center gap-3">
+                                <span className={cn(
+                                  'text-lg font-bold font-serif',
+                                  isCurrent ? 'text-amber-400' : 'text-slate-300'
+                                )}>
+                                  V{version.versionNumber}
+                                </span>
+                                <Badge variant={typeCfg.variant}>{typeCfg.label}</Badge>
+                                {isCurrent && (
+                                  <Badge variant="mint">当前版本</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>{date}</span>
+                                <span className="text-slate-500">·</span>
+                                <span className="font-mono text-slate-300">{time}</span>
+                              </div>
+                            </div>
+
+                            {/* 描述 */}
+                            <div className="text-sm text-slate-300 mb-3">
+                              {version.description}
+                            </div>
+
+                            {/* 统计行 */}
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs mb-3 pb-3 border-b border-ink-600/40">
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <Users className="w-3.5 h-3.5 text-amber-500/70" />
+                                <span>问卷 <span className="text-slate-200 font-medium">{version.surveyCount}</span> 份</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <Gauge className="w-3.5 h-3.5 text-amber-500/70" />
+                                <span>
+                                  平均匹配
+                                  <span className={cn(
+                                    'font-medium ml-0.5',
+                                    version.avgMatchScore >= 75 ? 'text-mint-400' : version.avgMatchScore >= 50 ? 'text-amber-400' : 'text-crimson-400'
+                                  )}>
+                                    {version.avgMatchScore}
+                                  </span>
+                                  分
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500/70" />
+                                <span>
+                                  警告
+                                  <span className={cn(
+                                    'font-medium ml-0.5',
+                                    version.warningCount === 0 ? 'text-mint-400' : 'text-crimson-400'
+                                  )}>
+                                    {version.warningCount}
+                                  </span>
+                                  个
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 变化对比 */}
+                            {version.diffFromPrev && version.diffFromPrev.changedPairs > 0 && (
+                              <div className="mb-3">
+                                <div className="flex items-center gap-1.5 text-xs text-sunset-400 font-medium mb-2">
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                  <span>较上版本：{version.diffFromPrev.changedPairs} 处变更</span>
+                                </div>
+                                <div className="bg-ink-600/30 rounded-lg p-2.5 space-y-1">
+                                  {version.diffFromPrev.changedDetails.map((detail, idx) => (
+                                    <div key={idx} className="text-xs text-slate-400 flex items-start gap-2">
+                                      <span className="text-sunset-400 shrink-0">·</span>
+                                      <span>{detail}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 操作按钮 */}
+                            <div className="flex justify-end">
+                              {isCurrent ? (
+                                <button
+                                  disabled
+                                  className="px-3 py-1.5 text-xs rounded-lg bg-mint-500/10 text-mint-400 border border-mint-500/30 cursor-default"
+                                >
+                                  ✓ 当前版本
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSwitchVersion(version.id)}
+                                  className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
+                                >
+                                  <GitBranch className="w-3.5 h-3.5" />
+                                  切换到此版本
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ========== Part 1: 冲突警告面板 ========== */}
         {totalRemainingWarnings > 0 && (
@@ -1142,16 +1428,25 @@ export default function AssignmentPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              if (id) finalizeAssignment(id);
-              navigate(`/schedules/${id}/review`);
-            }}
-            className="btn-gold flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            确认分角，进入复盘
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => navigate(`/schedules/${id}/prep`)}
+              className="btn-ghost flex items-center gap-2"
+            >
+              <ClipboardList className="w-4 h-4" />
+              📋 查看开本准备清单
+            </button>
+            <button
+              onClick={() => {
+                if (id) finalizeAssignment(id);
+                navigate(`/schedules/${id}/review`);
+              }}
+              className="btn-gold flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              确认分角，进入复盘
+            </button>
+          </div>
         </div>
       </div>
 

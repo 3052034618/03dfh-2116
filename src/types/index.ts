@@ -102,6 +102,22 @@ export interface PlayerProfile {
 }
 
 // ========== 分角与复盘 ==========
+export interface AssignmentVersion {
+  id: string;
+  versionNumber: number;
+  createdAt: string;
+  type: 'auto_generate' | 'manual_adjust' | 'regen_expired';
+  description: string;
+  surveyCount: number;
+  plan: AssignmentPair[];
+  warningCount: number;
+  avgMatchScore: number;
+  diffFromPrev?: {
+    changedPairs: number;
+    changedDetails: string[];
+  };
+}
+
 export interface AssignmentSuggestion {
   scheduleId: string;
   generatedAt: string;
@@ -110,6 +126,8 @@ export interface AssignmentSuggestion {
   warnings: AssignmentWarning[];
   manualAdjusted: boolean;
   finalPlan: AssignmentPair[];
+  versions: AssignmentVersion[];
+  currentVersionId: string;
 }
 
 export interface MatchScoreItem {

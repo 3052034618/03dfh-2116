@@ -227,8 +227,13 @@ export default function ScheduleDetailPage() {
       else if (survey.socialStyle === 'introvert') socialStyleCounts.introvert++;
       else socialStyleCounts.normal++;
 
-      if (survey.willingToLead === true) willingToLeadCounts.yes++;
-      else willingToLeadCounts.no++;
+      if (survey.willingToLead === true) {
+        willingToLeadCounts.yes++;
+      } else if (survey.socialStyle === 'introvert') {
+        willingToLeadCounts.no++;
+      } else {
+        willingToLeadCounts.maybe++;
+      }
     });
 
     const genreList = Object.entries(genreCounts)
@@ -236,7 +241,6 @@ export default function ScheduleDetailPage() {
       .map(([name, count]) => ({ name, count }));
 
     const tabooList = Object.entries(tabooCounts)
-      .filter(([, count]) => count >= 2)
       .sort((a, b) => b[1] - a[1])
       .map(([name, count]) => ({ name, count }));
 
@@ -652,12 +656,14 @@ export default function ScheduleDetailPage() {
                               </div>
                             </div>
                             <div>
-                              <div className="text-xs text-slate-500 mb-1.5">愿带动气氛</div>
+                              <div className="text-xs text-slate-500 mb-1.5">带动气氛意愿</div>
                               <span className={cn(
                                 'text-sm',
-                                sp.surveyResponse.willingToLead ? 'text-mint-400' : 'text-slate-400'
+                                sp.surveyResponse.willingToLead ? 'text-mint-400' :
+                                sp.surveyResponse.socialStyle === 'introvert' ? 'text-royal-400' : 'text-amber-300'
                               )}>
-                                {sp.surveyResponse.willingToLead ? '是' : '否'}
+                                {sp.surveyResponse.willingToLead ? '愿意' :
+                                 sp.surveyResponse.socialStyle === 'introvert' ? '不太想' : '看情况'}
                               </span>
                             </div>
                             <div>
@@ -747,36 +753,53 @@ export default function ScheduleDetailPage() {
                   </h3>
                   {surveySummary.taboos.length > 0 ? (
                     <div className="space-y-2">
-                      {surveySummary.taboos.slice(0, 3).map((taboo, idx) => (
-                        <div
-                          key={taboo.name}
-                          className={cn(
-                            'flex items-center justify-between',
-                            idx === 0 && 'text-base',
-                            idx === 1 && 'text-sm',
-                            idx >= 2 && 'text-xs'
-                          )}
-                        >
-                          <span
+                      {surveySummary.taboos.slice(0, 3).map((taboo, idx) => {
+                        const isMulti = taboo.count >= 2;
+                        return (
+                          <div
+                            key={taboo.name}
                             className={cn(
-                              'px-2 py-0.5 rounded-md font-medium',
-                              'bg-crimson-700/30 text-crimson-300 border border-crimson-500/40'
+                              'flex items-center justify-between',
+                              idx === 0 && 'text-base',
+                              idx === 1 && 'text-sm',
+                              idx >= 2 && 'text-xs'
                             )}
                           >
-                            {taboo.name}
-                          </span>
-                          <span className="text-crimson-400 font-mono font-semibold">
-                            {taboo.count}人
-                          </span>
-                        </div>
-                      ))}
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 rounded-md font-medium border',
+                                isMulti
+                                  ? 'bg-crimson-700/30 text-crimson-300 border-crimson-500/40'
+                                  : 'bg-sunset-700/30 text-sunset-300 border-sunset-500/40'
+                              )}
+                            >
+                              {taboo.name}
+                            </span>
+                            <span
+                              className={cn(
+                                'font-mono font-semibold',
+                                isMulti ? 'text-crimson-400' : 'text-sunset-400'
+                              )}
+                            >
+                              {taboo.count}人忌讳
+                            </span>
+                          </div>
+                        );
+                      })}
                       {surveySummary.taboos.length > 3 && (
                         <div className="flex flex-wrap gap-1 pt-1">
-                          {surveySummary.taboos.slice(3).map((taboo) => (
-                            <Badge key={taboo.name} variant="crimson" className="text-xs">
-                              {taboo.name} · {taboo.count}
-                            </Badge>
-                          ))}
+                          {surveySummary.taboos.slice(3).map((taboo) => {
+                            const isMulti = taboo.count >= 2;
+                            return (
+                              <Badge
+                                key={taboo.name}
+                                variant={isMulti ? 'crimson' : 'sunset'}
+                                className="text-xs"
+                              >
+                                {taboo.name} · {taboo.count}人忌讳
+                              </Badge>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -814,7 +837,7 @@ export default function ScheduleDetailPage() {
                 </div>
 
                 <div className="p-3 rounded-lg bg-ink-800/40 border border-ink-600/40">
-                  <h3 className="text-sm font-bold text-slate-200 mb-3">带动气氛</h3>
+                  <h3 className="text-sm font-bold text-slate-200 mb-3">带动气氛意愿</h3>
                   <div className="flex items-center justify-around">
                     <div className="text-center">
                       <div className="text-2xl font-serif font-bold text-mint-400">
@@ -831,7 +854,7 @@ export default function ScheduleDetailPage() {
                     </div>
                     <div className="w-px h-10 bg-ink-600/50" />
                     <div className="text-center">
-                      <div className="text-2xl font-serif font-bold text-slate-500">
+                      <div className="text-2xl font-serif font-bold text-royal-400">
                         {surveySummary.willingToLead.no}
                       </div>
                       <div className="text-xs text-slate-400 mt-1">不太想</div>
@@ -975,9 +998,13 @@ export default function ScheduleDetailPage() {
                               </div>
                             </div>
                             <div>
-                              <div className="text-slate-500 mb-1">带动气氛</div>
-                              <span className={survey.willingToLead ? 'text-mint-400' : 'text-slate-400'}>
-                                {survey.willingToLead ? '愿意' : '一般'}
+                              <div className="text-slate-500 mb-1">带动气氛意愿</div>
+                              <span className={
+                                survey.willingToLead ? 'text-mint-400' :
+                                survey.socialStyle === 'introvert' ? 'text-royal-400' : 'text-amber-300'
+                              }>
+                                {survey.willingToLead ? '愿意' :
+                                 survey.socialStyle === 'introvert' ? '不太想' : '看情况'}
                               </span>
                             </div>
                             <div>
@@ -1150,6 +1177,16 @@ export default function ScheduleDetailPage() {
                 {suggestion ? '查看分角方案' : '生成分角建议'}
               </span>
             </button>
+
+            {suggestion?.finalPlan && suggestion.finalPlan.length > 0 && (
+              <button
+                onClick={() => navigate(`/schedules/${schedule.id}/prep`)}
+                className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium transition-all text-sm btn-ghost"
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>📋 开本准备清单</span>
+              </button>
+            )}
           </div>
 
           {review && (

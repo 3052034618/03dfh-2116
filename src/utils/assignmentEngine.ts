@@ -15,20 +15,12 @@ import type {
 } from '@/types';
 
 export const GENRE_OPTIONS = [
-  '情感',
-  '硬核',
-  '欢乐',
-  '恐怖',
-  '阵营',
-  '本格',
-  '变格',
-  '还原',
-  '机制',
-  '古风',
-  '现代',
-  '民国',
-  '科幻',
-  '校园',
+  '情感', '治愈',
+  '硬核', '推理', '本格', '变格', '刑侦', '烧脑', '还原',
+  '恐怖', '中式', '校园',
+  '欢乐', '爆笑', '机制',
+  '阵营', '谍战',
+  '古风', '现代', '民国', '科幻',
 ] as const;
 
 export const TABOO_OPTIONS = [
@@ -43,21 +35,26 @@ export const TABOO_OPTIONS = [
 
 const GENRE_BADGE_MAP: Record<string, string> = {
   情感: 'badge-crimson',
+  治愈: 'badge-mint',
   硬核: 'badge-royal',
-  欢乐: 'badge-amber',
-  恐怖: 'badge-ink',
-  阵营: 'badge-mint',
+  推理: 'badge-royal',
   本格: 'badge-royal',
   变格: 'badge-royal',
+  刑侦: 'badge-royal',
+  烧脑: 'badge-royal',
   还原: 'badge-sunset',
+  恐怖: 'badge-ink',
+  中式: 'badge-crimson',
+  校园: 'badge-mint',
+  欢乐: 'badge-amber',
+  爆笑: 'badge-amber',
   机制: 'badge-amber',
+  阵营: 'badge-mint',
+  谍战: 'badge-sunset',
   古风: 'badge-crimson',
   现代: 'badge-ink',
   民国: 'badge-sunset',
   科幻: 'badge-royal',
-  校园: 'badge-mint',
-  治愈: 'badge-mint',
-  推理: 'badge-royal',
   沉浸: 'badge-crimson',
 };
 
@@ -560,6 +557,8 @@ export function generateAssignment(
     warnings,
     manualAdjusted: false,
     finalPlan,
+    versions: [],
+    currentVersionId: '',
   };
 }
 
