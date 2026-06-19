@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink-900 text-slate-200 min-h-screen;
+    background-image: radial-gradient(ellipse at top, rgba(75, 46, 122, 0.25) 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+
+  /* 细滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgba(37, 30, 48, 0.5);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #524568, #3D3352);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #6E5E8A, #524568);
+  }
+}
+
+@layer components {
+  /* 金色装饰标题 */
+  .title-gold {
+    @apply font-serif text-amber-400 font-semibold;
+    position: relative;
+    padding-left: 14px;
+  }
+  .title-gold::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: linear-gradient(180deg, #D4A84B, #8F7222);
+    border-radius: 2px;
+  }
+
+  /* 卡片基础样式 */
+  .card-dark {
+    @apply bg-ink-800/70 backdrop-blur-sm border border-ink-600/50 rounded-xl shadow-card;
+    position: relative;
+  }
+  .card-dark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image: linear-gradient(135deg, rgba(212,168,75,0.04), transparent 40%);
+    pointer-events: none;
+  }
+
+  /* 卡片悬停效果 */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+  .card-hover:hover {
+    @apply -translate-y-1 shadow-glow border-amber-500/30;
+  }
+
+  /* 金色边框按钮（主按钮） */
+  .btn-gold {
+    @apply px-5 py-2.5 rounded-lg font-medium text-ink-900 transition-all duration-300 relative overflow-hidden;
+    background: linear-gradient(135deg, #D4A84B 0%, #E8C76A 50%, #DDB753 100%);
+    box-shadow: 0 2px 12px rgba(212, 168, 75, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .btn-gold:hover {
+    box-shadow: 0 4px 24px rgba(212, 168, 75, 0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+  }
+  .btn-gold:active {
+    transform: translateY(0);
+  }
+
+  /* 幽灵按钮 */
+  .btn-ghost {
+    @apply px-5 py-2.5 rounded-lg font-medium text-slate-300 border border-ink-500/50 bg-ink-800/50 hover:border-amber-500/50 hover:text-amber-400 transition-all duration-300;
+  }
+
+  /* 危险按钮 */
+  .btn-danger {
+    @apply px-5 py-2.5 rounded-lg font-medium text-white transition-all duration-300;
+    background: linear-gradient(135deg, #A82A3D 0%, #C93A4E 100%);
+    box-shadow: 0 2px 12px rgba(201, 58, 78, 0.3);
+  }
+  .btn-danger:hover {
+    box-shadow: 0 4px 24px rgba(201, 58, 78, 0.5);
+  }
+
+  /* 标签徽章 */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+  .badge-royal {
+    @apply bg-royal-700/40 text-royal-100 border border-royal-600/50;
+  }
+  .badge-amber {
+    @apply bg-amber-500/15 text-amber-300 border border-amber-500/30;
+  }
+  .badge-mint {
+    @apply bg-mint-600/20 text-mint-300 border border-mint-500/30;
+  }
+  .badge-crimson {
+    @apply bg-crimson-700/30 text-crimson-300 border border-crimson-500/40;
+  }
+  .badge-sunset {
+    @apply bg-sunset-500/15 text-sunset-300 border border-sunset-500/30;
+  }
+  .badge-ink {
+    @apply bg-ink-700/80 text-slate-400 border border-ink-500/50;
+  }
+
+  /* 输入框样式 */
+  .input-dark {
+    @apply w-full px-4 py-2.5 rounded-lg bg-ink-900/60 border border-ink-500/50 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/20 transition-all duration-200;
+  }
+
+  /* 分隔金线 */
+  .divider-gold {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212,168,75,0.4), transparent);
+  }
+
+  /* 六边形裁切（用于角色头像） */
+  .hexagon {
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  }
+
+  /* 热力图单元格（匹配分数） */
+  .heat-cell {
+    @apply transition-all duration-200 relative cursor-pointer;
+  }
+  .heat-high {
+    background: linear-gradient(135deg, rgba(61, 163, 93, 0.35), rgba(76, 184, 110, 0.25));
+    border: 1px solid rgba(61, 163, 93, 0.5);
+  }
+  .heat-mid {
+    background: linear-gradient(135deg, rgba(232, 135, 58, 0.25), rgba(212, 168, 75, 0.18));
+    border: 1px solid rgba(232, 135, 58, 0.4);
+  }
+  .heat-low {
+    background: linear-gradient(135deg, rgba(201, 58, 78, 0.25), rgba(168, 42, 61, 0.18));
+    border: 1px solid rgba(201, 58, 78, 0.45);
+  }
+  .heat-conflict {
+    animation: pulse-danger 2s ease-in-out infinite;
+  }
+  @keyframes pulse-danger {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(201, 58, 78, 0.5); }
+    50% { box-shadow: 0 0 16px 2px rgba(201, 58, 78, 0.6); }
+  }
+
+  /* 星级评分 */
+  .star {
+    @apply inline-block transition-transform duration-150;
+  }
+  .star-active {
+    color: #D4A84B;
+    filter: drop-shadow(0 0 4px rgba(212, 168, 75, 0.6));
+  }
+  .star-inactive {
+    color: rgba(118, 118, 128, 0.3);
+  }
+
+  /* 导航项 */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-ink-700/50 transition-all duration-200 cursor-pointer;
+  }
+  .nav-item-active {
+    @apply text-amber-400 bg-ink-700/70 border-l-2 border-amber-500;
+    background-image: linear-gradient(90deg, rgba(212,168,75,0.08), transparent);
+  }
+
+  /* 噪声纹理叠加（给卡片增加质感） */
+  .grain-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    pointer-events: none;
+    border-radius: inherit;
+    mix-blend-mode: overlay;
+  }
+}
+
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #F8EDC8 0%, #D4A84B 50%, #8F7222 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
