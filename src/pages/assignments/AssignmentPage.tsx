@@ -48,7 +48,8 @@ import { generateAssignment, getHeatColorClass, getDifficultyLabel, getGenderLab
 import RoleAvatar from '@/components/ui/RoleAvatar';
 import Badge from '@/components/ui/Badge';
 import StarRating from '@/components/ui/StarRating';
-import type { AssignmentPair, AssignmentWarning, MatchCell, PlayerProfile, Role, Schedule, SchedulePlayer, Script, DM } from '@/types';
+import Modal from '@/components/ui/Modal';
+import type { AssignmentPair, AssignmentWarning, MatchCell, PlayerProfile, Role, Schedule, SchedulePlayer, Script, DM, MatchScoreItem, PlayerSurvey } from '@/types';
 
 const statusBadgeMap: Record<string, { variant: any; label: string }> = {
   pending: { variant: 'amber', label: '待确认' },
@@ -213,6 +214,8 @@ export default function AssignmentPage() {
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [pendingCell, setPendingCell] = useState<{ playerId: string; roleId: string } | null>(null);
   const [hoveredCell, setHoveredCell] = useState<{ playerId: string; roleId: string; x: number; y: number } | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailCell, setDetailCell] = useState<{ playerId: string; roleId: string } | null>(null);
 
   const schedule: Schedule | undefined = id ? getScheduleById(id) : undefined;
   const script: Script | undefined = schedule ? getScriptById(schedule.scriptId) : undefined;
@@ -273,6 +276,16 @@ export default function AssignmentPage() {
 
   const totalRemainingWarnings = groupedWarnings.high.length + groupedWarnings.medium.length + groupedWarnings.low.length;
 
+  const isExpired = useMemo(() => {
+    if (!suggestion || !schedule) return false;
+    const generatedTime = new Date(suggestion.generatedAt).getTime();
+    return schedule.players.some((sp) => {
+      if (!sp.surveyResponse?.submittedAt) return false;
+      const submittedTime = new Date(sp.surveyResponse.submittedAt).getTime();
+      return submittedTime > generatedTime;
+    });
+  }, [suggestion, schedule]);
+
   function createWarningKey(w: AssignmentWarning): string {
     return `${w.severity}-${w.playerIds.join(',')}-${w.roleIds.join(',')}`;
   }
@@ -325,6 +338,12 @@ export default function AssignmentPage() {
     }
 
     applyAssignment(playerId, roleId);
+  }
+
+  function handleShowDetail(playerId: string, roleId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setDetailCell({ playerId, roleId });
+    setShowDetailModal(true);
   }
 
   function applyAssignment(playerId: string, roleId: string) {
@@ -563,7 +582,12 @@ export default function AssignmentPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleRegenerate}
-                className="btn-ghost flex items-center gap-2"
+                className={cn(
+                  'flex items-center gap-2 transition-all',
+                  isExpired
+                    ? 'btn-gold animate-pulse shadow-[0_0_15px_rgba(251,191,36,0.4)]'
+                    : 'btn-ghost'
+                )}
               >
                 <RefreshCw className="w-4 h-4" />
                 重新生成建议
@@ -588,6 +612,34 @@ export default function AssignmentPage() {
             </div>
           </div>
         </div>
+
+        {/* ========== 过期警告条 ========== */}
+        {isExpired && (
+          <div className="mb-6 rounded-xl border border-sunset-500/40 bg-gradient-to-r from-sunset-500/20 via-amber-500/15 to-sunset-500/20 shadow-[0_0_20px_rgba(251,146,60,0.15)] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="font-semibold text-amber-300">
+                    问卷答案已更新，当前分角建议可能已过期
+                  </div>
+                  <div className="text-sm text-slate-400 mt-0.5">
+                    有玩家修改了问卷答案，建议重新生成分角方案以获得更准确的匹配
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleRegenerate}
+                className="btn-gold text-sm px-4 py-2 flex items-center gap-2 shrink-0"
+              >
+                <RefreshCw className="w-4 h-4" />
+                重新生成建议
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ========== Part 1: 冲突警告面板 ========== */}
         {totalRemainingWarnings > 0 && (
@@ -864,6 +916,13 @@ export default function AssignmentPage() {
                                   <AlertTriangle className="w-3.5 h-3.5 text-crimson-400" />
                                 </div>
                               )}
+                              <button
+                                onClick={(e) => handleShowDetail(profile.id, role.id, e)}
+                                className="absolute bottom-1 right-1 w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-ink-700/50 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                title="查看匹配详情"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </td>
                         );
@@ -1159,7 +1218,189 @@ export default function AssignmentPage() {
           </div>
         </div>
       )}
+
+      {/* 匹配详情弹窗 */}
+      {showDetailModal && detailCell && (
+        <MatchDetailModal
+          player={getPlayerById(detailCell.playerId)}
+          role={roles.find((r) => r.id === detailCell.roleId)}
+          cellData={getCellData(detailCell.playerId, detailCell.roleId)}
+          surveyResponse={playersData.find((p) => p.profile?.id === detailCell.playerId)?.schedulePlayer.surveyResponse}
+          onClose={() => {
+            setShowDetailModal(false);
+            setDetailCell(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+interface MatchDetailModalProps {
+  player: PlayerProfile | undefined;
+  role: Role | undefined;
+  cellData: MatchCell | undefined;
+  surveyResponse: PlayerSurvey | undefined;
+  onClose: () => void;
+}
+
+function MatchDetailModal({ player, role, cellData, surveyResponse, onClose }: MatchDetailModalProps) {
+  const positiveFactors = cellData?.positiveFactors || [];
+  const negativeFactors = cellData?.negativeFactors || [];
+
+  const genderPrefMap: Record<string, string> = {
+    match: '同性优先',
+    cross: '反串也行',
+    any: '随便',
+  };
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      size="lg"
+      title={`匹配详情 · ${player?.name || '?'} × ${role?.name || '?'}`}
+      footer={
+        <button onClick={onClose} className="btn-ghost">
+          关闭
+        </button>
+      }
+    >
+      {/* 匹配分大字展示 */}
+      <div className="text-center mb-6 pb-5 border-b border-ink-600/50">
+        <div className="text-sm text-slate-400 mb-2">综合匹配分</div>
+        <div className={cn(
+          'text-5xl font-bold',
+          (cellData?.score || 0) >= 75 ? 'text-mint-400' : (cellData?.score || 0) >= 50 ? 'text-amber-400' : 'text-crimson-400'
+        )}>
+          {cellData?.score || 0}
+          <span className="text-lg text-slate-500 font-normal ml-1">分</span>
+        </div>
+      </div>
+
+      {/* 板块一：加分因素 */}
+      {positiveFactors.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-mint-400 font-semibold">加分因素</span>
+            <span className="text-xs text-mint-500/70 bg-mint-500/10 px-2 py-0.5 rounded-full">
+              +{positiveFactors.reduce((sum, f) => sum + f.score, 0)} 分
+            </span>
+          </div>
+          <div className="space-y-2">
+            {positiveFactors.map((factor, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 p-3 rounded-lg bg-mint-500/5 border border-mint-500/20"
+              >
+                <span className="text-xl shrink-0">{factor.icon || '✅'}</span>
+                <span className="flex-1 text-sm text-slate-300">{factor.description}</span>
+                <span className="text-mint-400 font-semibold text-sm shrink-0">+{factor.score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 板块二：风险/减分项 */}
+      {negativeFactors.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-crimson-400 font-semibold">风险警告</span>
+            <span className="text-xs text-crimson-500/70 bg-crimson-500/10 px-2 py-0.5 rounded-full">
+              -{negativeFactors.reduce((sum, f) => sum + f.score, 0)} 分
+            </span>
+          </div>
+          <div className="space-y-2">
+            {negativeFactors.map((factor, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 p-3 rounded-lg bg-crimson-500/5 border border-crimson-500/20"
+              >
+                <span className="text-xl shrink-0">{factor.icon || '⚠️'}</span>
+                <span className="flex-1 text-sm text-slate-300">{factor.description}</span>
+                <span className="text-crimson-400 font-semibold text-sm shrink-0">-{factor.score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 板块三：问卷答案参考 */}
+      {surveyResponse && (
+        <div>
+          <div className="text-xs text-slate-500 font-medium mb-3 uppercase tracking-wider">
+            📋 该玩家问卷答案
+          </div>
+          <div className="bg-ink-700/30 rounded-xl p-4 space-y-4 border border-ink-600/30">
+            {/* 想玩类型 */}
+            <div>
+              <div className="text-xs text-slate-400 mb-2">想玩类型</div>
+              <div className="flex flex-wrap gap-2">
+                {surveyResponse.preferredGenres.length > 0 ? (
+                  surveyResponse.preferredGenres.map((g) => (
+                    <Badge key={g} variant="mint">{g}</Badge>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-500">未填写</span>
+                )}
+              </div>
+            </div>
+
+            {/* 忌讳内容 */}
+            <div>
+              <div className="text-xs text-slate-400 mb-2">忌讳内容</div>
+              <div className="flex flex-wrap gap-2">
+                {surveyResponse.tabooContent.length > 0 ? (
+                  surveyResponse.tabooContent.map((t) => (
+                    <Badge key={t} variant="crimson">{t}</Badge>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-500">无</span>
+                )}
+              </div>
+            </div>
+
+            {/* 社交风格 + 带动气氛 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-slate-400 mb-2">社交风格</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{socialStyleMap[surveyResponse.socialStyle].icon}</span>
+                  <span className="text-sm text-slate-300">{socialStyleMap[surveyResponse.socialStyle].label}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 mb-2">带动气氛</div>
+                <div className="text-sm text-slate-300">
+                  {surveyResponse.willingToLead ? '🎤 愿意' : '😐 看情况'}
+                </div>
+              </div>
+            </div>
+
+            {/* 性别偏好 */}
+            <div>
+              <div className="text-xs text-slate-400 mb-2">性别偏好</div>
+              <div className="text-sm text-slate-300">
+                {genderPrefMap[surveyResponse.genderPreference] || surveyResponse.genderPreference}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 无问卷时的提示 */}
+      {!surveyResponse && (
+        <div>
+          <div className="text-xs text-slate-500 font-medium mb-3 uppercase tracking-wider">
+            📋 该玩家问卷答案
+          </div>
+          <div className="bg-ink-700/30 rounded-xl p-4 text-center border border-ink-600/30">
+            <span className="text-sm text-slate-500">该玩家暂未提交问卷</span>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

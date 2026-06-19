@@ -173,6 +173,7 @@ export default function ScheduleDetailPage() {
 
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [expandedSurveys, setExpandedSurveys] = useState(false);
+  const [expandedSummary, setExpandedSummary] = useState(true);
 
   const existingPlayerIds = useMemo(
     () => new Set(schedule?.players.map((p) => p.playerId) || []),
@@ -197,6 +198,56 @@ export default function ScheduleDetailPage() {
     () => schedule?.players.filter((p) => p.surveyResponse).length || 0,
     [schedule]
   );
+
+  const surveySummary = useMemo(() => {
+    if (!schedule) return null;
+
+    const respondedPlayers = schedule.players.filter((p) => p.surveyResponse);
+    if (respondedPlayers.length === 0) return null;
+
+    const genreCounts: Record<string, number> = {};
+    const tabooCounts: Record<string, number> = {};
+    const socialStyleCounts = { social: 0, normal: 0, introvert: 0 };
+    const willingToLeadCounts = { yes: 0, maybe: 0, no: 0 };
+
+    respondedPlayers.forEach((sp) => {
+      const survey = sp.surveyResponse!;
+
+      survey.preferredGenres.forEach((g) => {
+        genreCounts[g] = (genreCounts[g] || 0) + 1;
+      });
+
+      survey.tabooContent.forEach((t) => {
+        if (t !== '都可以接受') {
+          tabooCounts[t] = (tabooCounts[t] || 0) + 1;
+        }
+      });
+
+      if (survey.socialStyle === 'social') socialStyleCounts.social++;
+      else if (survey.socialStyle === 'introvert') socialStyleCounts.introvert++;
+      else socialStyleCounts.normal++;
+
+      if (survey.willingToLead === true) willingToLeadCounts.yes++;
+      else willingToLeadCounts.no++;
+    });
+
+    const genreList = Object.entries(genreCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+
+    const tabooList = Object.entries(tabooCounts)
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+
+    return {
+      total: respondedPlayers.length,
+      genres: genreList,
+      taboos: tabooList,
+      socialStyles: socialStyleCounts,
+      willingToLead: willingToLeadCounts,
+    };
+  }, [schedule]);
 
   if (!schedule) {
     return (
@@ -631,6 +682,168 @@ export default function ScheduleDetailPage() {
                 })}
               </div>
             )}
+          </div>
+
+          <div className="card-dark grain-overlay p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="title-gold text-base mb-1">问卷偏好汇总</h2>
+                <p className="text-xs text-slate-500">
+                  已回收 {surveySummary?.total || 0} 份
+                </p>
+              </div>
+              <button
+                onClick={() => setExpandedSummary(!expandedSummary)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                  expandedSummary
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                    : 'bg-ink-800/60 text-slate-400 border-ink-600/50 hover:border-ink-500'
+                )}
+              >
+                {expandedSummary ? '收起详情' : '展开查看详情'}
+              </button>
+            </div>
+
+            {expandedSummary && surveySummary ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 rounded-lg bg-ink-800/40 border border-ink-600/40">
+                  <h3 className="text-sm font-bold text-slate-200 mb-3">想玩类型</h3>
+                  <div className="space-y-2">
+                    {surveySummary.genres.slice(0, 6).map((genre, idx) => {
+                      const maxCount = surveySummary.genres[0]?.count || 1;
+                      const pct = Math.round((genre.count / maxCount) * 100);
+                      return (
+                        <div key={genre.name} className="flex items-center gap-2">
+                          <span className="text-xs text-slate-300 w-16 shrink-0 truncate">
+                            {genre.name}
+                          </span>
+                          <div className="flex-1 h-4 rounded-full bg-ink-700/60 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-mono text-amber-300 w-6 text-right shrink-0">
+                            {genre.count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {surveySummary.genres.length > 6 && (
+                      <div className="text-xs text-slate-500 text-center pt-1">
+                        +{surveySummary.genres.length - 6} 种更多
+                      </div>
+                    )}
+                    {surveySummary.genres.length === 0 && (
+                      <div className="text-xs text-slate-500">暂无数据</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-ink-800/40 border border-ink-600/40">
+                  <h3 className="text-sm font-bold text-crimson-400 mb-3">
+                    ⚠️ 忌讳内容
+                  </h3>
+                  {surveySummary.taboos.length > 0 ? (
+                    <div className="space-y-2">
+                      {surveySummary.taboos.slice(0, 3).map((taboo, idx) => (
+                        <div
+                          key={taboo.name}
+                          className={cn(
+                            'flex items-center justify-between',
+                            idx === 0 && 'text-base',
+                            idx === 1 && 'text-sm',
+                            idx >= 2 && 'text-xs'
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'px-2 py-0.5 rounded-md font-medium',
+                              'bg-crimson-700/30 text-crimson-300 border border-crimson-500/40'
+                            )}
+                          >
+                            {taboo.name}
+                          </span>
+                          <span className="text-crimson-400 font-mono font-semibold">
+                            {taboo.count}人
+                          </span>
+                        </div>
+                      ))}
+                      {surveySummary.taboos.length > 3 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {surveySummary.taboos.slice(3).map((taboo) => (
+                            <Badge key={taboo.name} variant="crimson" className="text-xs">
+                              {taboo.name} · {taboo.count}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-mint-400 font-medium">
+                      大家都没啥忌讳～
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 rounded-lg bg-ink-800/40 border border-ink-600/40">
+                  <h3 className="text-sm font-bold text-slate-200 mb-3">社交风格</h3>
+                  <div className="flex items-center justify-around">
+                    <div className="text-center">
+                      <div className="text-2xl font-serif font-bold text-amber-400">
+                        {surveySummary.socialStyles.social}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">🐮 社牛</div>
+                    </div>
+                    <div className="w-px h-10 bg-ink-600/50" />
+                    <div className="text-center">
+                      <div className="text-2xl font-serif font-bold text-slate-300">
+                        {surveySummary.socialStyles.normal}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">😐 正常</div>
+                    </div>
+                    <div className="w-px h-10 bg-ink-600/50" />
+                    <div className="text-center">
+                      <div className="text-2xl font-serif font-bold text-royal-400">
+                        {surveySummary.socialStyles.introvert}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">🐢 社恐</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-ink-800/40 border border-ink-600/40">
+                  <h3 className="text-sm font-bold text-slate-200 mb-3">带动气氛</h3>
+                  <div className="flex items-center justify-around">
+                    <div className="text-center">
+                      <div className="text-2xl font-serif font-bold text-mint-400">
+                        {surveySummary.willingToLead.yes}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">愿意</div>
+                    </div>
+                    <div className="w-px h-10 bg-ink-600/50" />
+                    <div className="text-center">
+                      <div className="text-2xl font-serif font-bold text-amber-300">
+                        {surveySummary.willingToLead.maybe}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">看情况</div>
+                    </div>
+                    <div className="w-px h-10 bg-ink-600/50" />
+                    <div className="text-center">
+                      <div className="text-2xl font-serif font-bold text-slate-500">
+                        {surveySummary.willingToLead.no}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">不太想</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : expandedSummary && !surveySummary ? (
+              <div className="text-sm text-slate-500 text-center py-4">
+                暂无问卷数据，发送问卷后将显示汇总
+              </div>
+            ) : null}
           </div>
 
           <div className="card-dark p-5">

@@ -112,12 +112,21 @@ export interface AssignmentSuggestion {
   finalPlan: AssignmentPair[];
 }
 
+export interface MatchScoreItem {
+  description: string;
+  score: number;
+  icon?: string;
+  category?: string;
+}
+
 export interface MatchCell {
   playerId: string;
   roleId: string;
   score: number;
   reasons: string[];
   warnings: string[];
+  positiveFactors: MatchScoreItem[];
+  negativeFactors: MatchScoreItem[];
 }
 
 export interface AssignmentPair {

@@ -5,6 +5,7 @@ import type {
   Script,
   RoleRelation,
   MatchCell,
+  MatchScoreItem,
   Schedule,
   AssignmentSuggestion,
   AssignmentPair,
@@ -12,6 +13,53 @@ import type {
   AssignmentReview,
   TagAdjustment,
 } from '@/types';
+
+export const GENRE_OPTIONS = [
+  '情感',
+  '硬核',
+  '欢乐',
+  '恐怖',
+  '阵营',
+  '本格',
+  '变格',
+  '还原',
+  '机制',
+  '古风',
+  '现代',
+  '民国',
+  '科幻',
+  '校园',
+] as const;
+
+export const TABOO_OPTIONS = [
+  '恐怖画面',
+  '血腥暴力',
+  '情感纠葛',
+  '单人任务',
+  'NPC惊吓',
+  '跳跃惊吓',
+  '强光频闪',
+] as const;
+
+const GENRE_BADGE_MAP: Record<string, string> = {
+  情感: 'badge-crimson',
+  硬核: 'badge-royal',
+  欢乐: 'badge-amber',
+  恐怖: 'badge-ink',
+  阵营: 'badge-mint',
+  本格: 'badge-royal',
+  变格: 'badge-royal',
+  还原: 'badge-sunset',
+  机制: 'badge-amber',
+  古风: 'badge-crimson',
+  现代: 'badge-ink',
+  民国: 'badge-sunset',
+  科幻: 'badge-royal',
+  校园: 'badge-mint',
+  治愈: 'badge-mint',
+  推理: 'badge-royal',
+  沉浸: 'badge-crimson',
+};
 
 // ============ 内部辅助类型 ============
 interface ScoreComponent {
@@ -71,7 +119,25 @@ export function calculateMatchScore(
 ): MatchCell {
   const reasons: string[] = [];
   const warnings: string[] = [];
+  const positiveFactors: MatchScoreItem[] = [];
+  const negativeFactors: MatchScoreItem[] = [];
   let hardViolation = false;
+
+  function addPositive(description: string, rawScore: number, weightCategory: 'base' | 'pref' | 'relation' | 'exp', icon?: string) {
+    const scaleMap = { base: 40 / 120, pref: 30 / 120, relation: 20 / 60, exp: 10 / 8 };
+    const scaledScore = Math.round(Math.abs(rawScore) * scaleMap[weightCategory]);
+    if (scaledScore > 0) {
+      positiveFactors.push({ description, score: scaledScore, icon, category: weightCategory });
+    }
+  }
+
+  function addNegative(description: string, rawScore: number, weightCategory: 'base' | 'pref' | 'relation' | 'exp', icon?: string) {
+    const scaleMap = { base: 40 / 120, pref: 30 / 120, relation: 20 / 60, exp: 10 / 8 };
+    const scaledScore = Math.round(Math.abs(rawScore) * scaleMap[weightCategory]);
+    if (scaledScore > 0) {
+      negativeFactors.push({ description, score: scaledScore, icon, category: weightCategory });
+    }
+  }
 
   // ---------- 基础标签匹配分（满分40）----------
   let baseRaw = 0;
@@ -83,14 +149,18 @@ export function calculateMatchScore(
     if (role.gender === 'male' && player.gender === 'female') {
       hardViolation = true;
       warnings.push('性别硬约束冲突：角色要求男性，玩家为女性');
+      addNegative('性别硬约束冲突：角色要求男性，玩家为女性', 40, 'base', '🚫');
     } else if (role.gender === 'female' && player.gender === 'male') {
       hardViolation = true;
       warnings.push('性别硬约束冲突：角色要求女性，玩家为男性');
+      addNegative('性别硬约束冲突：角色要求女性，玩家为男性', 40, 'base', '🚫');
     } else {
       baseComponents.push({ raw: 30, max: 30, name: '性别', reason: '性别匹配' });
+      addPositive('性别匹配：角色与玩家性别一致', 30, 'base', '👤');
     }
   } else {
     baseComponents.push({ raw: 15, max: 30, name: '性别', reason: '性别无限制' });
+    addPositive('性别无限制：角色性别不限', 15, 'base', '👤');
   }
 
   // 难度适配
@@ -100,11 +170,13 @@ export function calculateMatchScore(
   if (role.difficulty >= minDiff && role.difficulty <= maxDiff) {
     difficultyScore = 20;
     reasons.push(`难度适配：玩家${getLevelLabel(playerLevel)}，角色难度${role.difficulty}在适配区间`);
+    addPositive(`难度适配：玩家${getLevelLabel(playerLevel)}，角色难度${role.difficulty}在适配区间`, 20, 'base', '⭐');
   } else {
     const diff = role.difficulty < minDiff ? minDiff - role.difficulty : role.difficulty - maxDiff;
     difficultyScore = -Math.min(20, diff * 10);
     if (difficultyScore < 0) {
       warnings.push(`难度偏离：玩家${getLevelLabel(playerLevel)}，角色难度${role.difficulty}偏${role.difficulty < minDiff ? '低' : '高'}`);
+      addNegative(`难度偏离：玩家${getLevelLabel(playerLevel)}，角色难度${role.difficulty}偏${role.difficulty < minDiff ? '低' : '高'}`, Math.abs(difficultyScore), 'base', '📊');
     }
   }
   baseComponents.push({ raw: difficultyScore, max: 20, name: '难度适配' });
@@ -115,8 +187,10 @@ export function calculateMatchScore(
   const emotionMatch = (role.emotionLevel / 5 - 0.5) * emotionRatio * 30;
   if (emotionMatch > 5) {
     reasons.push(`情感浓度匹配：角色情感等级${role.emotionLevel}，玩家情感偏好${emotionWeight}%`);
+    addPositive(`情感浓度匹配：角色情感等级${role.emotionLevel}，玩家情感偏好${emotionWeight}%`, emotionMatch, 'base', '💝');
   } else if (emotionMatch < -5) {
     warnings.push(`情感浓度不匹配：角色情感等级${role.emotionLevel}，玩家情感偏好${emotionWeight}%`);
+    addNegative(`情感浓度不匹配：角色情感等级${role.emotionLevel}，玩家情感偏好${emotionWeight}%`, Math.abs(emotionMatch), 'base', '💔');
   }
   baseComponents.push({ raw: emotionMatch, max: 15, name: '情感浓度' });
 
@@ -126,8 +200,10 @@ export function calculateMatchScore(
   const deductionMatch = (role.deductionLevel / 5 - 0.5) * deductionRatio * 30;
   if (deductionMatch > 5) {
     reasons.push(`推理参与度匹配：角色推理等级${role.deductionLevel}，玩家推理偏好${deductionWeight}%`);
+    addPositive(`推理参与度匹配：角色推理等级${role.deductionLevel}，玩家推理偏好${deductionWeight}%`, deductionMatch, 'base', '🔍');
   } else if (deductionMatch < -5) {
     warnings.push(`推理参与度不匹配：角色推理等级${role.deductionLevel}，玩家推理偏好${deductionWeight}%`);
+    addNegative(`推理参与度不匹配：角色推理等级${role.deductionLevel}，玩家推理偏好${deductionWeight}%`, Math.abs(deductionMatch), 'base', '🤔');
   }
   baseComponents.push({ raw: deductionMatch, max: 15, name: '推理参与度' });
 
@@ -135,10 +211,13 @@ export function calculateMatchScore(
   if (player.totalGames < 3) {
     if (role.beginnerFriendly) {
       baseComponents.push({ raw: 20, max: 20, name: '新手友好', reason: '新玩家 + 新手友好角色' });
+      reasons.push('新手友好：新玩家 + 新手友好角色');
+      addPositive('新手友好加成：新玩家适配新手友好角色', 20, 'base', '🌱');
     }
     if (role.difficulty >= 4) {
       baseComponents.push({ raw: -30, max: 20, name: '新手友好' });
       warnings.push('新手风险：新玩家被分配到高难度角色');
+      addNegative('新手风险：新玩家被分配到高难度角色', 30, 'base', '⚠️');
     }
   }
 
@@ -156,6 +235,7 @@ export function calculateMatchScore(
     if (genreMatches.length > 0) {
       prefRaw += genreMatches.length * 10;
       reasons.push(`题材偏好匹配：${genreMatches.join('、')}`);
+      addPositive(`问卷·题材偏好匹配：${genreMatches.join('、')}`, genreMatches.length * 10, 'pref', '🎯');
     }
 
     // 忌讳内容
@@ -163,6 +243,7 @@ export function calculateMatchScore(
     if (tabooHits.length > 0) {
       prefRaw -= tabooHits.length * 50;
       warnings.push(`忌讳内容命中：${tabooHits.join('、')}`);
+      addNegative(`问卷·忌讳内容命中：${tabooHits.join('、')}`, tabooHits.length * 50, 'pref', '⛔');
     }
 
     // 社交风格 + 主持型
@@ -170,14 +251,26 @@ export function calculateMatchScore(
       if (survey.socialStyle === 'introvert') {
         prefRaw -= 40;
         warnings.push('社交风格冲突：社恐玩家分配到主持型角色');
+        addNegative('问卷·社交风格冲突：社恐玩家分配到主持型角色', 40, 'pref', '🐢');
       } else if (survey.socialStyle === 'social') {
         prefRaw += 20;
         reasons.push('社牛适配主持型角色');
+        addPositive('问卷·社牛适配主持型角色', 20, 'pref', '🐮');
       }
       if (survey.willingToLead) {
         prefRaw += 15;
         reasons.push('玩家主动愿意带动气氛');
+        addPositive('问卷·玩家主动愿意带动气氛', 15, 'pref', '🎤');
       }
+    }
+
+    // 性别偏好
+    if (survey.genderPreference === 'match' && role.gender !== 'any' && role.gender === player.gender) {
+      prefRaw += 10;
+      addPositive('问卷·性别偏好匹配：偏好同性角色', 10, 'pref', '👍');
+    } else if (survey.genderPreference === 'cross' && role.gender !== 'any' && role.gender !== player.gender) {
+      prefRaw += 10;
+      addPositive('问卷·性别偏好匹配：偏好反串角色', 10, 'pref', '🎭');
     }
   }
 
@@ -203,9 +296,11 @@ export function calculateMatchScore(
             if (rel.type === 'lover') {
               relationRaw += 25;
               reasons.push('情侣玩家 + 情侣角色关系加成');
+              addPositive('情侣CP加成：情侣玩家分配到情侣角色', 25, 'relation', '💑');
             } else if (rel.type === 'enemy' && rel.intensity >= 2) {
               relationRaw -= 50;
               warnings.push('高风险：情侣玩家被分配到强对立角色');
+              addNegative('高风险：情侣玩家被分配到强对立角色', 50, 'relation', '💔');
             }
           }
         }
@@ -216,6 +311,7 @@ export function calculateMatchScore(
   // 熟人同阵营/家族
   const acquaintanceIds = schedulePlayer.acquaintanceWith;
   if (acquaintanceIds && acquaintanceIds.length > 0) {
+    let foundFriendly = false;
     for (const otherSP of allSchedulePlayers) {
       if (!acquaintanceIds.includes(otherSP.playerId)) continue;
       for (const otherRole of script.roles) {
@@ -224,9 +320,12 @@ export function calculateMatchScore(
         if (rel && (rel.type === 'family' || rel.type === 'partner')) {
           relationRaw += 10;
           reasons.push('熟人玩家分配到同阵营/家族角色');
+          addPositive('熟人加成：熟人玩家分配到同阵营/家族角色', 10, 'relation', '👥');
+          foundFriendly = true;
           break;
         }
       }
+      if (foundFriendly) break;
     }
   }
 
@@ -242,9 +341,11 @@ export function calculateMatchScore(
       if (past.score >= 4) {
         expRaw += 8;
         reasons.push(`历史好评：曾扮演${tagOverlap.join('、')}类型角色且反馈良好`);
+        addPositive(`历史经验加成：曾扮演${tagOverlap.join('、')}类型角色且反馈良好`, 8, 'exp', '🏆');
       } else if (past.score <= 2) {
         expRaw -= 8;
         warnings.push(`历史落差：曾扮演${tagOverlap.join('、')}类型角色且反馈较差`);
+        addNegative(`历史经验扣分：曾扮演${tagOverlap.join('、')}类型角色且反馈较差`, 8, 'exp', '📉');
       }
       break;
     }
@@ -267,6 +368,8 @@ export function calculateMatchScore(
     score: finalScore,
     reasons,
     warnings,
+    positiveFactors,
+    negativeFactors,
   };
 }
 
@@ -607,20 +710,7 @@ export function getGenderLabel(gender: string): string {
 }
 
 export function getGenreBadgeClass(genre: string): string {
-  const mapping: Record<string, string> = {
-    恐怖: 'badge-rose',
-    情感: 'badge-pink',
-    硬核: 'badge-indigo',
-    欢乐: 'badge-amber',
-    阵营: 'badge-emerald',
-    本格: 'badge-slate',
-    变格: 'badge-purple',
-    推理: 'badge-blue',
-    机制: 'badge-teal',
-    还原: 'badge-cyan',
-    沉浸: 'badge-fuchsia',
-  };
-  return mapping[genre] || 'badge-royal';
+  return GENRE_BADGE_MAP[genre] || 'badge-ink';
 }
 
 // ============ 私有工具（外部不导出，仅供内部使用） ============

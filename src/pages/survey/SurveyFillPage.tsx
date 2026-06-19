@@ -4,18 +4,9 @@ import { Send, BookOpen, CheckCircle2 } from 'lucide-react';
 import { useScheduleStore } from '@/stores/scheduleStore';
 import { useScriptStore } from '@/stores/scriptStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { GENRE_OPTIONS, TABOO_OPTIONS } from '@/utils/assignmentEngine';
 import type { PlayerSurvey } from '@/types';
 import { cn } from '@/lib/utils';
-
-const GENRE_OPTIONS = [
-  '情感', '硬核', '恢复', '恐怖', '欢乐', '阵营',
-  '机制', '古风', '现代', '民国', '科幻', '校园',
-];
-
-const TABOO_OPTIONS = [
-  '恐怖画面', '血腥暴力', '情感纠葛', '单人任务',
-  'NPC惊吓', '跳跃惊吓', '都可以接受',
-];
 
 const SOCIAL_STYLES: { value: PlayerSurvey['socialStyle']; emoji: string; label: string; desc: string }[] = [
   { value: 'social', emoji: '🐮', label: '社牛', desc: '我爱互动，带节奏！' },
@@ -269,12 +260,12 @@ export default function SurveyFillPage() {
           <div>
             <h3 className="title-gold text-base mb-3">有没有忌讳的内容？</h3>
             <div className="flex flex-wrap gap-2">
-              {TABOO_OPTIONS.map((taboo) => (
+              {[...TABOO_OPTIONS, '都可以接受'].map((taboo) => (
                 <Chip
                   key={taboo}
                   label={taboo}
                   selected={tabooContent.includes(taboo)}
-                  color="crimson"
+                  color={taboo === '都可以接受' ? 'amber' : 'crimson'}
                   onClick={() => toggleTaboo(taboo)}
                 />
               ))}
