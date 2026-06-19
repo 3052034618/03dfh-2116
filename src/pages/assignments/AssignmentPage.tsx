@@ -578,7 +578,7 @@ export default function AssignmentPage() {
               <button
                 onClick={() => {
                   if (id) finalizeAssignment(id);
-                  navigate(`/assignments/${id}/review`);
+                  navigate(`/schedules/${id}/review`);
                 }}
                 className="btn-gold flex items-center gap-2"
               >
@@ -1086,7 +1086,7 @@ export default function AssignmentPage() {
           <button
             onClick={() => {
               if (id) finalizeAssignment(id);
-              navigate(`/assignments/${id}/review`);
+              navigate(`/schedules/${id}/review`);
             }}
             className="btn-gold flex items-center gap-2"
           >

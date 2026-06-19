@@ -122,7 +122,10 @@ export const useAssignmentStore = create<AssignmentState>()((set, get) => ({
         finalRoleId: planItem?.roleId,
       }
     })
-    useScheduleStore.getState().updateSchedule(scheduleId, { players: updatedPlayers })
+    useScheduleStore.getState().updateSchedule(scheduleId, { 
+      players: updatedPlayers,
+      status: 'playing' as const,
+    })
   },
   getReview: (scheduleId) => {
     return get().reviews.find((review) => review.scheduleId === scheduleId)
@@ -130,13 +133,17 @@ export const useAssignmentStore = create<AssignmentState>()((set, get) => ({
   saveReview: (review) => {
     set((state) => {
       const existingIdx = state.reviews.findIndex((r) => r.id === review.id)
+      let newReviews
       if (existingIdx >= 0) {
-        const newReviews = [...state.reviews]
+        newReviews = [...state.reviews]
         newReviews[existingIdx] = review
-        return { reviews: newReviews }
+      } else {
+        newReviews = [...state.reviews, review]
       }
-      return { reviews: [...state.reviews, review] }
+      return { reviews: newReviews }
     })
+    // 同步更新车次状态为 finished
+    useScheduleStore.getState().updateSchedule(review.scheduleId, { status: 'finished' as const })
   },
   getHistoricalReviews: (filters) => {
     return get().reviews.filter((review) => {

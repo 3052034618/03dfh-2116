@@ -114,7 +114,7 @@ export const useScheduleStore = create<ScheduleState>()((set, get) => ({
           ? {
               ...schedule,
               players: schedule.players.map((p) =>
-                p.playerId === playerId ? { ...p, survey: survey } : p
+                p.playerId === playerId ? { ...p, surveyResponse: survey } : p
               ),
             }
           : schedule

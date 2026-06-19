@@ -159,6 +159,7 @@ export default function ScheduleDetailPage() {
   const getSuggestion = useAssignmentStore((s) => s.getSuggestion);
   const generateSuggestion = useAssignmentStore((s) => s.generateSuggestion);
   const getReview = useAssignmentStore((s) => s.getReview);
+  const updatePlayerSurvey = useScheduleStore((s) => s.updatePlayerSurvey);
 
   const schedule = id ? getScheduleById(id) : undefined;
   const script = schedule ? getScriptById(schedule.scriptId) : undefined;
@@ -230,6 +231,68 @@ export default function ScheduleDetailPage() {
   const handleSendSurvey = () => {
     if (!schedule) return;
     sendSurvey(schedule.id);
+    
+    // 模拟问卷回收：发送后为每个玩家生成随机但合理的问卷回答
+    schedule.players.forEach((sp, idx) => {
+      const delay = 300 + idx * 600;
+      setTimeout(() => {
+        const profile = getPlayerById(sp.playerId);
+        const weights = profile?.tagWeights || { emotion: 50, deduction: 50, horror: 40, joy: 50, camp: 40 };
+        
+        // 基于偏好权重生成题材偏好
+        const preferredGenres: string[] = [];
+        if (weights.emotion >= 55) preferredGenres.push('情感');
+        if (weights.emotion >= 70) preferredGenres.push('治愈');
+        if (weights.deduction >= 55) preferredGenres.push('硬核');
+        if (weights.deduction >= 70) preferredGenres.push('推理');
+        if (weights.horror >= 55) preferredGenres.push('恐怖');
+        if (weights.joy >= 55) preferredGenres.push('欢乐');
+        if (weights.joy >= 70) preferredGenres.push('机制');
+        if (weights.camp >= 55) preferredGenres.push('阵营');
+        if (preferredGenres.length === 0) preferredGenres.push('情感', '推理');
+        
+        // 忌讳内容
+        const tabooPool = ['恐怖画面', '血腥暴力', '情感纠葛', '单人任务', 'NPC惊吓', '跳跃惊吓'];
+        const tabooContent: string[] = [];
+        if (weights.horror <= 30) tabooContent.push('恐怖画面', 'NPC惊吓');
+        tabooPool.forEach((t) => { if (Math.random() < 0.15 && !tabooContent.includes(t)) tabooContent.push(t); });
+        
+        // 社交风格
+        const totalGames = profile?.totalGames || 0;
+        let socialStyle: 'social' | 'normal' | 'introvert' = 'normal';
+        const rand = Math.random();
+        if (totalGames >= 20 && rand < 0.35) socialStyle = 'social';
+        else if (totalGames <= 3 && rand < 0.45) socialStyle = 'introvert';
+        else if (rand < 0.25) socialStyle = 'introvert';
+        else if (rand < 0.5) socialStyle = 'social';
+        
+        // 带动气氛意愿
+        const willingToLead = socialStyle === 'social' ? Math.random() < 0.8
+          : socialStyle === 'normal' ? Math.random() < 0.45
+          : Math.random() < 0.15;
+        
+        // 性别偏好
+        const genderPrefRand = Math.random();
+        const genderPreference: 'match' | 'cross' | 'any' = genderPrefRand < 0.55 ? 'match' : genderPrefRand < 0.75 ? 'any' : 'cross';
+        
+        updatePlayerSurvey(schedule.id, sp.playerId, {
+          submittedAt: new Date().toISOString(),
+          preferredGenres: preferredGenres.slice(0, 4),
+          tabooContent,
+          socialStyle,
+          willingToLead,
+          genderPreference,
+          extraNotes: socialStyle === 'introvert' ? '希望安静一点的角色' : willingToLead ? '想拿有表现空间的角色～' : '',
+        });
+        
+        // 全部回收后更新状态为 completed
+        if (idx === schedule.players.length - 1) {
+          updateSchedule(schedule.id, { surveyStatus: 'completed' });
+        } else {
+          updateSchedule(schedule.id, { surveyStatus: 'partial' });
+        }
+      }, delay);
+    });
   };
 
   const handleCopyLink = () => {

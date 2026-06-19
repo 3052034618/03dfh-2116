@@ -242,9 +242,9 @@ export default function ScheduleListPage() {
       date: form.date,
       startTime: form.startTime,
       endTime: form.endTime,
-      roomId: form.room,
+      room: form.room,
       notes: form.notes,
-    } as any);
+    });
     setShowCreateModal(false);
     setForm(defaultForm);
   };
