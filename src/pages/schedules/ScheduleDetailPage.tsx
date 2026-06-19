@@ -295,9 +295,20 @@ export default function ScheduleDetailPage() {
     });
   };
 
-  const handleCopyLink = () => {
-    const link = `${window.location.origin}/survey/${schedule.id}`;
-    navigator.clipboard?.writeText(link);
+  const handleCopyLink = (playerId?: string) => {
+    if (!schedule) return;
+    if (playerId) {
+      const link = `${window.location.origin}/survey/${schedule.id}/${playerId}`;
+      navigator.clipboard?.writeText(link);
+      return;
+    }
+    const links = schedule.players
+      .map((sp) => {
+        const profile = getPlayerById(sp.playerId);
+        return `${profile?.name || '玩家'}: ${window.location.origin}/survey/${schedule.id}/${sp.playerId}`;
+      })
+      .join('\n');
+    navigator.clipboard?.writeText(links);
   };
 
   const renderSocialStyleIcon = (style: PlayerSurvey['socialStyle']) => {
@@ -521,6 +532,13 @@ export default function ScheduleDetailPage() {
                               </span>
                             </div>
                           )}
+                          <button
+                            onClick={() => handleCopyLink(sp.playerId)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-ink-700/50 transition-all"
+                            title="复制该玩家问卷链接"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
                           {hasSurvey && (
                             <button
                               onClick={() =>
@@ -630,7 +648,7 @@ export default function ScheduleDetailPage() {
                   <span>重新发送</span>
                 </button>
                 <button
-                  onClick={handleCopyLink}
+                  onClick={() => handleCopyLink()}
                   className="btn-ghost flex items-center gap-1.5 text-sm"
                 >
                   <Copy className="w-4 h-4" />
@@ -805,7 +823,7 @@ export default function ScheduleDetailPage() {
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm text-slate-300 font-medium">角色预览</h4>
                     <button
-                      onClick={() => navigate(`/scripts/${script.id}`)}
+                      onClick={() => navigate(`/scripts/${script.id}/edit`)}
                       className="text-xs text-amber-400 hover:underline flex items-center gap-1"
                     >
                       <span>查看详情</span>

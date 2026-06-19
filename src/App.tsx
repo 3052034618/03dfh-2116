@@ -10,6 +10,7 @@ import ScheduleListPage from '@/pages/schedules/ScheduleListPage';
 import ScheduleDetailPage from '@/pages/schedules/ScheduleDetailPage';
 import AssignmentPage from '@/pages/assignments/AssignmentPage';
 import ReviewPage from '@/pages/assignments/ReviewPage';
+import SurveyFillPage from '@/pages/survey/SurveyFillPage';
 
 export default function App() {
   return (
@@ -26,8 +27,9 @@ export default function App() {
           <Route path="/schedules/:id/review" element={<ReviewPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/players" element={<PlayersPage />} />
-          <Route path="*" element={<NotFoundPage />} />
         </Route>
+        <Route path="/survey/:scheduleId/:playerId" element={<SurveyFillPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

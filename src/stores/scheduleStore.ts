@@ -1,5 +1,6 @@
 import type { Schedule, SchedulePlayer, SurveyStatus } from '@/types'
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { schedules } from '@/data/mockData'
 import { format, isSameDay, isWithinInterval, parseISO } from 'date-fns'
 
@@ -34,7 +35,9 @@ const generateId = () => {
   return 'sch_' + Math.random().toString(36).substring(2, 9)
 }
 
-export const useScheduleStore = create<ScheduleState>()((set, get) => ({
+export const useScheduleStore = create<ScheduleState>()(
+  persist(
+    (set, get) => ({
   schedules: schedules,
   currentScheduleId: null,
   getScheduleById: (id) => {
@@ -138,4 +141,10 @@ export const useScheduleStore = create<ScheduleState>()((set, get) => ({
   getTodaySchedules: () => {
     return get().getSchedulesByDate('2026-06-20')
   },
-}))
+}),
+    {
+      name: 'murder-mystery-schedules',
+      partialize: (state) => ({ schedules: state.schedules }),
+    }
+  )
+)

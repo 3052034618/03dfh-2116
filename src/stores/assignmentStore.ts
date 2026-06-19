@@ -1,5 +1,6 @@
 import type { AssignmentSuggestion, AssignmentReview, FinalRolePlan, PlayerProfile } from '@/types'
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { assignmentReviews } from '@/data/mockData'
 import { generateAssignment } from '@/utils/assignmentEngine'
 import { useScheduleStore } from '@/stores/scheduleStore'
@@ -28,7 +29,9 @@ interface AssignmentState {
   getHistoricalReviews: (filters: ReviewFilters) => AssignmentReview[]
 }
 
-export const useAssignmentStore = create<AssignmentState>()((set, get) => ({
+export const useAssignmentStore = create<AssignmentState>()(
+  persist(
+    (set, get) => ({
   suggestions: {},
   reviews: assignmentReviews,
   generateSuggestion: (scheduleId) => {
@@ -165,4 +168,13 @@ export const useAssignmentStore = create<AssignmentState>()((set, get) => ({
       return true
     })
   },
-}))
+}),
+    {
+      name: 'murder-mystery-assignments',
+      partialize: (state) => ({ 
+        suggestions: state.suggestions, 
+        reviews: state.reviews 
+      }),
+    }
+  )
+)
